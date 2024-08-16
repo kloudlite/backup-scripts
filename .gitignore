@@ -1,0 +1,4 @@
+.direnv
+.nix-closure
+.result
+.result.d

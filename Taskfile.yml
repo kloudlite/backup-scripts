@@ -1,0 +1,36 @@
+version: 3
+
+tasks:
+  k3s-etcd:
+    dir: ./k3s-etcd
+    cmds:
+      - |+
+        sudo rm -rf ./.result ./.result.d ./.nix-closure
+
+        nix build .#k3s-etcd -o .result
+
+        mkdir -p .nix-closure
+        sudo cp -R $(nix-store -qR .result) .nix-closure
+
+        mkdir -p .result.d
+        cp -R .result/bin .result.d/
+        cp -R .result/lib .result.d/
+
+        docker build -t sample .
+
+  mongodb-backup:
+    dir: ./mongodb
+    cmds:
+      - |+
+        sudo rm -rf ./.result ./.result.d ./.nix-closure
+
+        nix build .#mongodb-backup -o .result
+
+        mkdir -p .nix-closure
+        sudo cp -R $(nix-store -qR .result) .nix-closure
+
+        mkdir -p .result.d
+        cp -R .result/bin .result.d/
+        cp -R .result/lib .result.d/
+
+        docker build -t sample .
