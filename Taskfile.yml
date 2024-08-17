@@ -3,6 +3,9 @@ version: 3
 tasks:
   k3s-etcd:
     dir: ./k3s-etcd
+    requires:
+      vars:
+        - image
     cmds:
       - |+
         sudo rm -rf ./.result ./.result.d ./.nix-closure
@@ -13,13 +16,16 @@ tasks:
         sudo cp -R $(nix-store -qR .result) .nix-closure
 
         mkdir -p .result.d
-        cp -R .result/bin .result.d/
-        cp -R .result/lib .result.d/
+        [ -d .result/bin ] && cp -R .result/bin .result.d/
+        [ -d .result/lib ] && cp -R .result/lib .result.d/
 
-        docker build -t sample .
+        docker build -t {{.image}} .
 
   mongodb-backup:
     dir: ./mongodb
+    requires:
+      vars:
+        - image
     cmds:
       - |+
         sudo rm -rf ./.result ./.result.d ./.nix-closure
@@ -30,7 +36,28 @@ tasks:
         sudo cp -R $(nix-store -qR .result) .nix-closure
 
         mkdir -p .result.d
-        cp -R .result/bin .result.d/
-        cp -R .result/lib .result.d/
+        [ -d .result/bin ] && cp -R .result/bin .result.d/
+        [ -d .result/lib ] && cp -R .result/lib .result.d/
 
-        docker build -t sample .
+        # docker build -t {{.image}} .
+        docker buildx build --output=type=image,compression=zstd,force-compression=true,compression-level=12,push=true -t {{.image}} .
+
+  nats-backup:
+    dir: ./nats
+    requires:
+      vars:
+        - image
+    cmds:
+      - |+
+        sudo rm -rf ./.result ./.result.d ./.nix-closure
+
+        nix build .#nats-backup -o .result
+
+        mkdir -p .nix-closure
+        sudo cp -R $(nix-store -qR .result) .nix-closure
+
+        mkdir -p .result.d
+        [ -d .result/bin ] && cp -R .result/bin .result.d/
+        [ -d .result/lib ] && cp -R .result/lib .result.d/
+
+        docker build -t {{.image}} .

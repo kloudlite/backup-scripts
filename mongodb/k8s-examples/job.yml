@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backup-mongo-example
+  namespace: kloudlite
+  labels: &labels
+    kloudlite.io/job.for: mongodb-backup
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels: *labels
+    spec:
+      containers:
+      - env:
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              key: .CLUSTER_LOCAL_URI
+              name: msvc-mongo-svc-creds
+
+        - name: MAX_NUM_BACKUPS
+          value: "5"
+
+        - name: BACKUP_DIR
+          value: /mongo-backups
+
+        - name: ENCRYPTION_PASSWORD
+          value: example-encryption-password # replace with secure one for real usecase
+        image: ghcr.io/kloudlite/backup-scripts/mongodb:latest
+        command:
+          - bash
+          - ./backup.sh
+        imagePullPolicy: Always
+        name: mongo-backup
+        resources: {}
+        volumeMounts:
+        - mountPath: /mongo-backups
+          name: mongo-backups
+      dnsPolicy: ClusterFirst
+      restartPolicy: OnFailure
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: mongo-backups
+        emptyDir: {}

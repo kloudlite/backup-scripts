@@ -9,6 +9,7 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
+        pkgsCross = import nixpkgs { inherit system; crossSystem = pkgs.stdenv.hostPlatform; };
 
         k3s_etcd_inputs = with pkgs; [
           bash
@@ -19,15 +20,32 @@
         mongodb_backup_inputs = with pkgs; [
           bash
           openssl
+          # zstd
+          (pkgs.stdenv.mkDerivation {
+            name = "zstd";
+            src = pkgs.zstd;
+            installPhase = "mkdir -p $out/bin; cp $src/bin/zstd $out/bin";
+          })
+          (pkgs.stdenv.mkDerivation {
+            name = "mongodump";
+            src = pkgs.mongodb-tools;
+            installPhase = "mkdir -p $out/bin; cp $src/bin/mongodump $out/bin";
+          })
+          # (mongodb-tools)
+        ];
+
+        nats_backup_inputs = with pkgs; [
+          bash
+          openssl
           zstd
-          mongodb-tools
+          natscli
         ];
       in
       {
         devShells.default = pkgs.mkShell {
           # hardeningDisable = [ "all" ];
 
-          buildInputs = k3s_etcd_inputs ++ [];
+          buildInputs = k3s_etcd_inputs ++ [ ];
 
           shellHook = ''
           '';
@@ -49,7 +67,22 @@
             name = "mongodb-backup";
             paths = mongodb_backup_inputs;
           };
-          # installPhase = "mkdir -p $out;cp -r $src/bin $out/bin; cp -r $src/lib $out/lib";
+          installPhase = ''
+            mkdir -p $out
+            cp -r $src/bin $out
+            # if [ -d "$out/share" ]; then
+            #   rm -rf $out/share # as it's mostly man pages
+            # fi
+          '';
+          # installPhase = "cp -r $src $out";
+        };
+
+        packages.nats-backup = pkgs.stdenv.mkDerivation {
+          name = "nats-backup";
+          src = pkgs.buildEnv {
+            name = "nats-backup";
+            paths = nats_backup_inputs;
+          };
           installPhase = "cp -r $src $out";
         };
       }
