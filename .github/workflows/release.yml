@@ -1,0 +1,129 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag: 
+        type: string
+        description: "image_tag"
+        required: true
+        default: ""
+
+
+  repository_dispatch:
+    types:
+      - webhook
+
+  push:
+    branches:
+      - release-*
+
+    paths:
+      - ".github/*"
+      - "k3s-etcd/*"
+      - "monogdb/*"
+      - "nats/*"
+      - "flake.*"
+      - "Taskfile.yml"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-images:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [etcd, mongodb, nats]
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runs-on: ubuntu-latest
+            # runs-on: blacksmith-2vcpu-ubuntu-2204
+             
+          - arch: arm64
+            # runs-on: warp-ubuntu-2404-arm64-4x
+            runs-on: blacksmith-4vcpu-ubuntu-2204-arm
+
+    runs-on: ${{ matrix.runs-on }}
+    name: ${{ matrix.image }}-${{ matrix.arch }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create Image Tag
+        if: ${{ inputs.image_tag != '' }}
+        shell: bash
+        run: |+
+          echo "IMAGE_TAG=${{ inputs.image_tag }}" >> $GITHUB_ENV
+
+      - name: Create Image Tag from branch name / tags
+        if: ${{ inputs.image_tag == '' }}
+        # uses: nxtcoder17/actions/generate-image-tag@main
+        uses: nxtcoder17/actions/.github/actions/generate-image-tag@main
+
+      - name: build container images
+        uses: ./.github/actions/release/
+        with:
+          image_name: ghcr.io/${{ github.repository }}/${{ matrix.image }}
+          # image_tag: ${{ inputs.image_tag }}
+          image_tag: ${{ env.IMAGE_TAG }}-${{ matrix.arch }}
+
+          cachix_enabled: true
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+          docker_enabled: true
+
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          git_directory: "."
+
+          etcd: ${{ matrix.image == 'etcd' }}
+          mongodb: ${{ matrix.image == 'mongodb' }}
+          nats: ${{ matrix.image == 'nats' }}
+
+
+  multiarch-images:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [etcd, mongodb, nats]
+
+    needs: build-images
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    env:
+      image_name: ghcr.io/${{ github.repository }}/${{ matrix.image }}
+
+    steps:
+      - name: setup docker
+        uses: nxtcoder17/actions/.github/actions/setup-docker@main
+        with:
+          docker_username: ${{ github.actor }}
+          docker_password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Image Tag
+        if: ${{ inputs.image_tag != '' }}
+        shell: bash
+        run: |+
+          echo "IMAGE_TAG=${{ inputs.image_tag }}" >> $GITHUB_ENV
+
+      - name: Create Image Tag from branch name / tags
+        if: ${{ inputs.image_tag == '' }}
+        # uses: nxtcoder17/actions/generate-image-tag@main
+        uses: nxtcoder17/actions/.github/actions/generate-image-tag@main
+
+      - name: multiarch manifest build
+        shell: bash
+        run: |
+          docker manifest create ${image_name}:${IMAGE_TAG} ${image_name}:${IMAGE_TAG}-amd64 ${image_name}:${IMAGE_TAG}-arm64
+
+          docker manifest annotate ${image_name}:${IMAGE_TAG} ${image_name}:${IMAGE_TAG}-amd64 --os linux --arch amd64
+          docker manifest annotate ${image_name}:${IMAGE_TAG} ${image_name}:${IMAGE_TAG}-arm64 --os linux --arch arm64
+
+          docker manifest push ${image_name}:${IMAGE_TAG}
+

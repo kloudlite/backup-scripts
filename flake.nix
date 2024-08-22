@@ -45,6 +45,7 @@
           # hardeningDisable = [ "all" ];
 
           buildInputs = k3s_etcd_inputs ++ (with pkgs; [
+            go-task
             pre-commit
             (python312.withPackages (ps: with ps; [
               ggshield
