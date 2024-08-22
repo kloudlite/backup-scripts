@@ -1,0 +1,66 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag: 
+        type: string
+        description: "image_tag"
+        required: true
+        default: ""
+
+
+  repository_dispatch:
+    types:
+      - webhook
+
+  push:
+    paths:
+      - "k3s-etcd/*"
+      - "monogdb/*"
+      - "nats/*"
+      - "flake.*"
+      - "Taskfile.yml"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-images:
+    strategy:
+      fail-fast: false
+      matrix:
+        images: [etcd, mongodb, nats]
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runs-on: ubuntu-latest
+            # runs-on: blacksmith-2vcpu-ubuntu-2204
+             
+          - arch: arm64
+            runs-on: warp-ubuntu-2404-arm64-4x
+            # runs-on: blacksmith-4vcpu-ubuntu-2204-arm
+
+    runs-on: ubuntu-latest
+    name: ${{ matrix.images.name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: build container images
+        uses: ./.github/actions/release/
+        with:
+          image_tag: ${{ inputs.image_tag }}
+
+          cachix_enabled: true
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+          docker_enabled: true
+
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          git_directory: "."
+
+          etcd: ${{ matrix.images.name == 'etcd' }}
+          mongodb: ${{ matrix.images.name == 'mongodb' }}
+          nats: ${{ matrix.images.name == 'nats' }}
