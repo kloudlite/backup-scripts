@@ -2,3 +2,4 @@
 .nix-closure
 .result
 .result.d
+.secrets

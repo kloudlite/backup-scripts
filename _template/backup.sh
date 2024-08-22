@@ -4,6 +4,42 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
+cat <<EOF
+                             ↙↙                                       
+                            ↘↘↘↘                                      
+                          ↘↘↘↘↘↘↘↘                                    
+                        ↘↘↘↘↘↘↘↘↘↘↘                                   
+                      ↘↘↘↘↘↘↘↘↘↘↘↘                                    
+                    ↘↘↘↘↘↘↘↘↘↘↘↘                                      
+                  ↖↘↘↘↘↘↘↘↘↘↘↘                                        
+                 ↘↘↘↘↘↘↘↘↘↘↘            ↘↘↘                           
+               ↘↘↘↘↘↘↘↘↘↘↘            ↘↘↘↘↘↘↘                         
+             ↘↘↘↘↘↘↘↘↘↘↘↓           ↘↘↘↘↘↘↘↘↘↘↘                       
+           ↘↘↘↘↘↘↘↘↘↘↘↘           ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↙                     
+         ↓↘↘↘↘↘↘↘↘↘↘↘           ↓↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘                    
+        ↘↘↘↘↘↘↘↘↘↘↘            ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘                  
+      ↘↘↘↘↘↘↘↘↘↘↘            ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘                
+    ↘↘↘↘↘↘↘↘↘↘↘←           ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘              
+  ↘↘↘↘↘↘↘↘↘↘↘↘           ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↓            MongoDB Backup
+ ↘↘↘↘↘↘↘↘↘↘↘            ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘           #built at#
+  ↘↘↘↘↘↘↘↘↘↘↘↘           ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↖            
+    ↘↘↘↘↘↘↘↘↘↘↘↘           ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘              
+      ↘↘↘↘↘↘↘↘↘↘↘↙           ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘                
+        ↘↘↘↘↘↘↘↘↘↘↘↖           ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘                  
+         ↙↘↘↘↘↘↘↘↘↘↘↘           ↖↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘                    
+           ↘↘↘↘↘↘↘↘↘↘↘↘           ↙↘↘↘↘↘↘↘↘↘↘↘↘↘                      
+             ↘↘↘↘↘↘↘↘↘↘↘↘           ↘↘↘↘↘↘↘↘↘↘↙                       
+               ↘↘↘↘↘↘↘↘↘↘↘↓           ↘↘↘↘↘↘↘                         
+                 ↘↘↘↘↘↘↘↘↘↘↘↙           ↘↘↘                           
+                   ↘↘↘↘↘↘↘↘↘↘↘                                        
+                    ↘↘↘↘↘↘↘↘↘↘↘↘                                      
+                      ↘↘↘↘↘↘↘↘↘↘↘↘                                    
+                        ↘↘↘↘↘↘↘↘↘↘↘↙                                  
+                          ↘↘↘↘↘↘↘↘                                    
+                            ↘↘↘↘                                      
+                             ↙←                                       
+EOF
+
 echo "${ENCRYPTION_PASSWORD?Error: env-var is not set}" >/dev/null
 echo "${BACKUP_DIR?Error: env-var is not set}" >/dev/null
 
@@ -13,6 +49,14 @@ TIMESTAMP=$(date +"%Y_%m_%d_%H_%M_%S")
 TMP_BACKUP_DIR="/tmp/backup_$TIMESTAMP"
 
 mkdir -p "$BACKUP_DIR" "$TMP_BACKUP_DIR"
+
+debug() {
+  # [ "${DEBUG:-false}" == "true" ] && echo "$@" # throws non-zero exit code, if DEBUG is not set
+
+  if [ "${DEBUG:-false}" == "true" ]; then
+    echo "$@"
+  fi
+}
 
 encrypt() {
   openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -in "$1" -out "$2" -pass pass:"$ENCRYPTION_PASSWORD"
@@ -40,7 +84,7 @@ MAX_NUM_BACKUPS=${MAX_NUM_BACKUPS:-10}
 idx=1
 for backup in $all_backups; do
   if [ $idx -gt $((MAX_NUM_BACKUPS)) ]; then
-    rm -rf "$backup"
+    rm -rf "${BACKUP_DIR:?}/$backup"
   fi
   idx=$((idx + 1))
 done

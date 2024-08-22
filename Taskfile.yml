@@ -1,6 +1,19 @@
 version: 3
 
 tasks:
+  s3-explorer:
+    dotenv:
+      - .secrets/s3.env
+    silent: true
+    cmds:
+      - |+
+        chmod 600 .secrets/s3.access
+
+        mkdir -p /tmp/s3-explorer
+        s3fs $S3_BUCKET_NAME /tmp/s3-explorer $S3FS_FLAGS -o passwd_file=.secrets/s3.access
+
+        ranger /tmp/s3-explorer
+
   k3s-etcd:
     dir: ./k3s-etcd
     requires:
@@ -10,16 +23,16 @@ tasks:
       - |+
         sudo rm -rf ./.result ./.result.d ./.nix-closure
 
-        nix build .#k3s-etcd -o .result
+        # nix build .#k3s-etcd -o .result
 
         mkdir -p .nix-closure
-        sudo cp -R $(nix-store -qR .result) .nix-closure
+        sudo cp -r $(nix-store -qR .result) .nix-closure
 
         mkdir -p .result.d
-        [ -d .result/bin ] && cp -R .result/bin .result.d/
-        [ -d .result/lib ] && cp -R .result/lib .result.d/
+        [ -d .result/bin ] && cp -r .result/bin .result.d/
+        [ -d .result/lib ] && cp -r .result/lib .result.d/
 
-        docker build -t {{.image}} .
+        docker buildx build --output=type=image,compression=zstd,force-compression=true,compression-level=12,push=true -t {{.image}} .
 
   mongodb-backup:
     dir: ./mongodb
@@ -33,13 +46,13 @@ tasks:
         nix build .#mongodb-backup -o .result
 
         mkdir -p .nix-closure
-        sudo cp -R $(nix-store -qR .result) .nix-closure
+        # sudo cp -r -p $(nix-store -qR .result) .nix-closure
+        cp -r $(nix-store -qR .result) .nix-closure
 
         mkdir -p .result.d
         [ -d .result/bin ] && cp -R .result/bin .result.d/
         [ -d .result/lib ] && cp -R .result/lib .result.d/
 
-        # docker build -t {{.image}} .
         docker buildx build --output=type=image,compression=zstd,force-compression=true,compression-level=12,push=true -t {{.image}} .
 
   nats-backup:
@@ -60,4 +73,4 @@ tasks:
         [ -d .result/bin ] && cp -R .result/bin .result.d/
         [ -d .result/lib ] && cp -R .result/lib .result.d/
 
-        docker build -t {{.image}} .
+        docker buildx build --output=type=image,compression=zstd,force-compression=true,compression-level=12,push=true -t {{.image}} .

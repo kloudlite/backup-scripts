@@ -11,41 +11,46 @@
         pkgs = import nixpkgs { inherit system; };
         pkgsCross = import nixpkgs { inherit system; crossSystem = pkgs.stdenv.hostPlatform; };
 
+        zstd = pkgs.stdenv.mkDerivation {
+          name = "zstd";
+          src = pkgs.zstd;
+          installPhase = "mkdir -p $out/bin; cp $src/bin/zstd $out/bin";
+        };
+
         k3s_etcd_inputs = with pkgs; [
           bash
           openssl
-          zstd
-        ];
+        ] ++ [ zstd ];
 
         mongodb_backup_inputs = with pkgs; [
           bash
           openssl
           # zstd
           (pkgs.stdenv.mkDerivation {
-            name = "zstd";
-            src = pkgs.zstd;
-            installPhase = "mkdir -p $out/bin; cp $src/bin/zstd $out/bin";
-          })
-          (pkgs.stdenv.mkDerivation {
             name = "mongodump";
             src = pkgs.mongodb-tools;
             installPhase = "mkdir -p $out/bin; cp $src/bin/mongodump $out/bin";
           })
           # (mongodb-tools)
-        ];
+        ] ++ [ zstd ];
 
         nats_backup_inputs = with pkgs; [
           bash
           openssl
-          zstd
           natscli
-        ];
+        ] ++ [ zstd ];
       in
       {
         devShells.default = pkgs.mkShell {
           # hardeningDisable = [ "all" ];
 
-          buildInputs = k3s_etcd_inputs ++ [ ];
+          buildInputs = k3s_etcd_inputs ++ (with pkgs; [
+            pre-commit
+            (python312.withPackages (ps: with ps; [
+              ggshield
+            ]))
+            s3fs
+          ]);
 
           shellHook = ''
           '';
@@ -58,7 +63,14 @@
             paths = k3s_etcd_inputs;
           };
           # installPhase = "mkdir -p $out;cp -r $src/bin $out/bin; cp -r $src/lib $out/lib";
-          installPhase = "cp -r $src $out";
+          # installPhase = "cp -r $src $out";
+          installPhase = ''
+            mkdir -p $out
+            cp -r $src/bin $out
+            if [ -d "$src/lib" ]; then
+              cp -r $src/lib $out
+            fi
+          '';
         };
 
         packages.mongodb-backup = pkgs.stdenv.mkDerivation {

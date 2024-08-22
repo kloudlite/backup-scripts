@@ -4,38 +4,85 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
+cat <<EOF
+                             ↙↙                                       
+                            ↘↘↘↘                                      
+                          ↘↘↘↘↘↘↘↘                                    
+                        ↘↘↘↘↘↘↘↘↘↘↘                                   
+                      ↘↘↘↘↘↘↘↘↘↘↘↘                                    
+                    ↘↘↘↘↘↘↘↘↘↘↘↘                                      
+                  ↖↘↘↘↘↘↘↘↘↘↘↘                                        
+                 ↘↘↘↘↘↘↘↘↘↘↘            ↘↘↘                           
+               ↘↘↘↘↘↘↘↘↘↘↘            ↘↘↘↘↘↘↘                         
+             ↘↘↘↘↘↘↘↘↘↘↘↓           ↘↘↘↘↘↘↘↘↘↘↘                       
+           ↘↘↘↘↘↘↘↘↘↘↘↘           ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↙                     
+         ↓↘↘↘↘↘↘↘↘↘↘↘           ↓↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘                    
+        ↘↘↘↘↘↘↘↘↘↘↘            ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘                  
+      ↘↘↘↘↘↘↘↘↘↘↘            ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘                
+    ↘↘↘↘↘↘↘↘↘↘↘←           ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘              
+  ↘↘↘↘↘↘↘↘↘↘↘↘           ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↓            NATS Backup
+ ↘↘↘↘↘↘↘↘↘↘↘            ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘           #built at#
+  ↘↘↘↘↘↘↘↘↘↘↘↘           ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↖            
+    ↘↘↘↘↘↘↘↘↘↘↘↘           ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘              
+      ↘↘↘↘↘↘↘↘↘↘↘↙           ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘                
+        ↘↘↘↘↘↘↘↘↘↘↘↖           ↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘                  
+         ↙↘↘↘↘↘↘↘↘↘↘↘           ↖↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘↘                    
+           ↘↘↘↘↘↘↘↘↘↘↘↘           ↙↘↘↘↘↘↘↘↘↘↘↘↘↘                      
+             ↘↘↘↘↘↘↘↘↘↘↘↘           ↘↘↘↘↘↘↘↘↘↘↙                       
+               ↘↘↘↘↘↘↘↘↘↘↘↓           ↘↘↘↘↘↘↘                         
+                 ↘↘↘↘↘↘↘↘↘↘↘↙           ↘↘↘                           
+                   ↘↘↘↘↘↘↘↘↘↘↘                                        
+                    ↘↘↘↘↘↘↘↘↘↘↘↘                                      
+                      ↘↘↘↘↘↘↘↘↘↘↘↘                                    
+                        ↘↘↘↘↘↘↘↘↘↘↘↙                                  
+                          ↘↘↘↘↘↘↘↘                                    
+                            ↘↘↘↘                                      
+                             ↙←                                       
+EOF
+
 echo "${ENCRYPTION_PASSWORD?Error: env-var is not set}" >/dev/null
 echo "${BACKUP_DIR?Error: env-var is not set}" >/dev/null
-
 echo "${NATS_URL?Error: env-var is not set}" >/dev/null
 
-mkdir -p "$BACKUP_DIR"
+# other required vars in above format
 
 TIMESTAMP=$(date +"%Y_%m_%d_%H_%M_%S")
-TMP_BACKUP_DIR="/tmp/nats-backup_$TIMESTAMP"
+TMP_BACKUP_DIR="/tmp/backup_$TIMESTAMP"
 
-mkdir -p "$TMP_BACKUP_DIR"
+mkdir -p "$BACKUP_DIR" "$TMP_BACKUP_DIR"
 
-nats account backup --server="$NATS_URL" "$TMP_BACKUP_DIR" -f
+debug() {
+  if [ "${DEBUG:-false}" == "true" ]; then
+    echo "$@"
+  fi
+}
 
-tar cf "${TMP_BACKUP_DIR}.tar" "${TMP_BACKUP_DIR}"
-zstd --rm "${TMP_BACKUP_DIR}.tar" -o "${TMP_BACKUP_DIR}.tar.zst"
-
-openssl rand -hex 16 >salt.txt
+archive() {
+  tar cf "$2" -C "$(dirname $1)" "$1"
+}
 
 encrypt() {
-  command openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt -in "$1" -out "$1.enc" -pass pass:"$ENCRYPTION_PASSWORD"
+  openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -in "$1" -out "$2" -pass pass:"$ENCRYPTION_PASSWORD"
 }
 
-decrypt() {
-  name=$1
-  d_name=${name//.enc/}
-  openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -in "$name" -out "$d_name" -pass pass:"$ENCRYPTION_PASSWORD"
+compress() {
+  zstd --rm "$1" -o "$2"
 }
 
-encrypt "$TMP_BACKUP_DIR.tar.zst"
+debug "taking nats backup"
+nats account backup --server="$NATS_URL" "$TMP_BACKUP_DIR" -f
 
-cp "$TMP_BACKUP_DIR"/*.zst.enc "$BACKUP_DIR"
+debug "bundling backups as an archive"
+archive "${TMP_BACKUP_DIR}" "${TMP_BACKUP_DIR}.tar"
+
+debug "compressing backup archive"
+compress "${TMP_BACKUP_DIR}.tar" "${TMP_BACKUP_DIR}.tar.zst"
+
+debug "encrypting compressed backup archive"
+encrypt "$TMP_BACKUP_DIR.tar.zst" "$TMP_BACKUP_DIR.tar.zst.enc"
+
+debug "copying result to backup dir"
+cp "$TMP_BACKUP_DIR.tar.zst.enc" "$BACKUP_DIR"
 
 all_backups=$(ls -t "$BACKUP_DIR")
 
@@ -44,7 +91,7 @@ MAX_NUM_BACKUPS=${MAX_NUM_BACKUPS:-10}
 idx=1
 for backup in $all_backups; do
   if [ $idx -gt $((MAX_NUM_BACKUPS)) ]; then
-    rm -rf "$backup"
+    rm -rf "${BACKUP_DIR:?}/$backup"
   fi
   idx=$((idx + 1))
 done
