@@ -6,21 +6,17 @@ inputs:
     description: 'GitHub Token'
     required: true
 
-  image_name:
-    description: 'image name'
-    default: ''
+  image_name: 
+    description: 'image repository prefix'
+    required: true
 
-  image_tag:
-    description: 'image tag, if empty, will be generated from branch or tag'
-    default: ''
-
-  cachix_enabled:
-    description: "cachix enabled"
-    default: "false"
+  image_tag: 
+    description: 'image tag'
+    required: true
 
   cachix_cache_name:
     description: "cachix cache name"
-    default: "kloudlite"
+    default: ""
 
   cachix_auth_token:
     description: "cachix auth token"
@@ -29,7 +25,7 @@ inputs:
     description: "dokcer enabled"
     default: "false"
 
-  git_directory:
+  working_directory:
     description: 'git directory'
     default: "."
 
@@ -49,75 +45,42 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: setup ENV Variables
-      shell: bash
-      id: env-vars
-      working-directory: ${{ inputs.git_directory }}
-      run: |+
-        echo "PUSH_IMAGE=false" >> $GITHUB_ENV
-        echo "IMAGE_NAME=${{inputs.image_name}}" >> $GITHUB_ENV
-
     - name: setup nix (with cachix)
-      if: ${{ inputs.cachix_enabled == 'true' }}
-      # uses: nxtcoder17/actions/setup-nix-cachix@main
-      uses: nxtcoder17/actions/.github/actions/setup-nix-cachix@main
+      uses: kloudlite/actions/setup-nix-cachix@v1
       with:
-        flake_lock: ${{ inputs.git_directory }}/flake.lock
-        nix_develop_arguments: "${{ inputs.git_directory }}#default"
+        flake_lock: ${{ inputs.working_directory }}/flake.lock
+        nix_develop_arguments: "${{ inputs.working_directory }}#default"
 
         cachix_cache_name: ${{ inputs.cachix_cache_name }}
         cachix_auth_token: ${{ inputs.cachix_auth_token }}
 
-    - name: setup nix cache (with github cache)
-      if: ${{ inputs.cachix_enabled == 'false' }}
-      # uses: nxtcoder17/actions/setup-nix-github@main
-      uses: nxtcoder17/actions/.github/actions/setup-nix-github@main
-      with:
-        flake_lock: ${{ inputs.git_directory }}/flake.lock
-        nix_develop_arguments: "${{ inputs.git_directory }}#default"
-
     - name: setup docker
       if: ${{ inputs.docker_enabled == 'true' }}
       # uses: nxtcoder17/actions/setup-docker@main
-      uses: nxtcoder17/actions/.github/actions/setup-docker@main
+      uses: kloudlite/actions/setup-docker@v1
       with:
+        docker_registry: ghcr.io
         docker_username: ${{ github.actor }}
         docker_password: ${{ inputs.github_token }}
 
-    - name: check if image needs to be pushed
-      if: github.event_name != 'pull_request'
-      shell: bash
-      run: |+
-        echo "PUSH_IMAGE=true" >> $GITHUB_ENV
-
-    - name: Create Image Tag
-      if: ${{ inputs.image_tag != '' }}
-      shell: bash
-      run: |+
-        echo "IMAGE_TAG=${{ inputs.image_tag }}" >> $GITHUB_ENV
-
-    - name: Create Image Tag from branch name / tags
-      if: ${{ inputs.image_tag == '' }}
-      # uses: nxtcoder17/actions/generate-image-tag@main
-      uses: nxtcoder17/actions/.github/actions/generate-image-tag@main
 
     - name: etcd backup script
       if: ${{ inputs.etcd == 'true' }}
-      working-directory: ${{ inputs.git_directory }}/k3s-etcd
+      working-directory: ${{ inputs.working_directory }}/k3s-etcd
       shell: bash
       run: |
-        task k3s-etcd image=$IMAGE_NAME:{{.IMAGE_TAG}}
+        task k3s-etcd image=${{ inputs.image_name }}:${{ inputs.image_tag }}
 
     - name: mongodb backup script
       if: ${{ inputs.mongodb == 'true' }}
-      working-directory: ${{ inputs.git_directory }}/mongodb
+      working-directory: ${{ inputs.working_directory }}/mongodb
       shell: bash
       run: |
-        task mongodb-backup image=$IMAGE_NAME:$IMAGE_TAG
+        task mongodb-backup image=${{ inputs.image_name }}:${{ inputs.image_tag }}
 
     - name: nats backup script
       if: ${{ inputs.nats == 'true' }}
-      working-directory: ${{ inputs.git_directory }}/nats
+      working-directory: ${{ inputs.working_directory }}/nats
       shell: bash
       run: |
-        task nats-backup image=$IMAGE_NAME:$IMAGE_TAG
+        task nats-backup image=${{ inputs.image_name }}:${{ inputs.image_tag }}

@@ -19,5 +19,5 @@ COPY --chown=1001:1001 --chmod=700 ./backup.sh ./backup.sh
 
 RUN sed -i "s|#built at#|Built at $(date +'+%r (%Z) on %b %d, %Y')|" ./backup.sh
 
-USER 1001:1001
+# USER 1001:1001
 ENTRYPOINT ["./backup.sh"]

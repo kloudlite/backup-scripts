@@ -33,7 +33,7 @@ permissions:
 jobs:
   build-images:
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         image: [etcd, mongodb, nats]
         arch: [amd64, arm64]
@@ -48,40 +48,33 @@ jobs:
 
     runs-on: ${{ matrix.runs-on }}
     name: ${{ matrix.image }}-${{ matrix.arch }}
+    outputs:
+      image_tag: ${{ steps.build-action.outputs.image_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Create Image Tag
-        if: ${{ inputs.image_tag != '' }}
-        shell: bash
-        run: |+
-          echo "IMAGE_TAG=${{ inputs.image_tag }}" >> $GITHUB_ENV
-
       - name: Create Image Tag from branch name / tags
-        if: ${{ inputs.image_tag == '' }}
-        # uses: nxtcoder17/actions/generate-image-tag@main
-        uses: nxtcoder17/actions/.github/actions/generate-image-tag@main
+        uses: kloudlite/actions/generate-image-tag@v1
 
       - name: build container images
+        id: build-action
         uses: ./.github/actions/release/
         with:
           image_name: ghcr.io/${{ github.repository }}/${{ matrix.image }}
-          # image_tag: ${{ inputs.image_tag }}
           image_tag: ${{ env.IMAGE_TAG }}-${{ matrix.arch }}
 
-          cachix_enabled: true
+          cachix_cache_name: ${{ secrets.CACHIX_CACHE_NAME }}
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
           docker_enabled: true
 
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          git_directory: "."
+          working_directory: "."
 
           etcd: ${{ matrix.image == 'etcd' }}
           mongodb: ${{ matrix.image == 'mongodb' }}
           nats: ${{ matrix.image == 'nats' }}
-
 
   multiarch-images:
     strategy:
@@ -101,21 +94,13 @@ jobs:
 
     steps:
       - name: setup docker
-        uses: nxtcoder17/actions/.github/actions/setup-docker@main
+        uses: kloudlite/actions/setup-docker@v1
         with:
           docker_username: ${{ github.actor }}
           docker_password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create Image Tag
-        if: ${{ inputs.image_tag != '' }}
-        shell: bash
-        run: |+
-          echo "IMAGE_TAG=${{ inputs.image_tag }}" >> $GITHUB_ENV
-
       - name: Create Image Tag from branch name / tags
-        if: ${{ inputs.image_tag == '' }}
-        # uses: nxtcoder17/actions/generate-image-tag@main
-        uses: nxtcoder17/actions/.github/actions/generate-image-tag@main
+        uses: kloudlite/actions/generate-image-tag@v1
 
       - name: multiarch manifest build
         shell: bash

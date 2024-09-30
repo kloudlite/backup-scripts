@@ -67,6 +67,7 @@
           # installPhase = "cp -r $src $out";
           installPhase = ''
             mkdir -p $out
+            ls -al $src
             cp -r $src/bin $out
             if [ -d "$src/lib" ]; then
               cp -r $src/lib $out
